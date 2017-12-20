@@ -28,7 +28,10 @@ can6mm = conf+'background/empty_can_6mm.txt'
 #deteff = np.load(conf+'deteff_mar2016.npy')
 #DETEFF = np.load(conf+'assembled_vanadium_nospurions_perspexed.npy')
 #DETEFF = np.load(conf+'vanadium_perspex_Jul2016.npy')
-DETEFF = np.load(conf+'vanadium/vanadium_perspex_nov2016.npy').flatten()
+DETEFF533 = np.load(conf+'vanadium/vanadium_perspex_nov2016.npy').flatten()
+DETEFF = DETEFF533
+DETEFF133 = DETEFF533
+DETEFF733 = DETEFF533
 DETEFF955 = np.load(conf+'vanadium/vanadium_955_mar2017.npy').flatten()
 DETEFF755 = np.load(conf+'vanadium/vanadium_755_mar2017.npy').flatten()
 #tth = np.load(conf+'tth_mar2016.npy')
@@ -338,7 +341,7 @@ tth533_Al222 = 360/np.pi * np.arcsin( lambda_533 /2 / (d_Al / np.sqrt(12) ) )
 tth533_Al400 = 360/np.pi * np.arcsin( lambda_533 /2 / (d_Al / np.sqrt(16) ) )
 tth533_Al133 = 360/np.pi * np.arcsin( lambda_533 /2 / (d_Al / np.sqrt(19) ) )
 
-npixels=1408
+detector_nr_o_pixels=1408
 
 def angle_xray_to_pearl(xray_twotheta,pearl_lambda = 1.667,xray_lambda=1.54):
     """ def angle_xray_to_pearl( xray_twotheta, pearl_lambda = 1.667, xray_lambda=1.54) """
@@ -659,7 +662,7 @@ def read_2016file(*args):
         if 'data filename' in header2016:
             header['file_name'] = header2016['data filename']
         if 'Scan filename' in header2016:
-            header['labview_configuration_filename'] = header2016['Scan filename']
+            header['self.configuration_filename'] = header2016['Scan filename']
         if 'Title' in header2016:
             header['experiment_name'] = header2016['Title']
         if 'Comment' in header2016:
@@ -715,8 +718,8 @@ def read_2016file(*args):
 #    elif 'Nrsubsetpoints' in header:
 #        measurement_nr_o_points_set = int(header['Nrsubsetpoints'])
     measuring_time_sec = np.zeros((npoints,1))
-    det = np.zeros((npixels, npoints))
-    mon = np.zeros((npixels, npoints))
+    det = np.zeros((detector_nr_o_pixels, npoints))
+    mon = np.zeros((detector_nr_o_pixels, npoints))
     parnames2016 = a[file_format_table_constants_nr_o_rows].split('\t') # the length changes depending on what you 'scan'
     parnames2016 = [x.strip('\n') for x in parnames2016] # remove the \n from 'MeasT'
     parnameunits = a[file_format_table_constants_nr_o_rows+1].split('\t') # the length changes depending on what you 'scan'
@@ -755,19 +758,19 @@ def read_2017file(filename, file_format_version):
     measuring_time_sec = np.zeros((measurement_nr_o_points,1))
     det = np.zeros((file_format_table_detector_nr_o_rows, measurement_nr_o_points))
     mon = np.zeros((file_format_table_detector_nr_o_rows, measurement_nr_o_points))
-    parnames = a[file_format_table_constants_nr_o_rows].split('\t') # the length changes depending on what you 'scan'
+    parnames = a[file_format_table_constants_nr_o_rows].split('\t') # the length of table_variables changes depending on what you 'scan'
     parnames = [x.strip('\n') for x in parnames] # remove the \n from 'measuring_time_sec'
-    # set up dtype for a np.zeros which will be filled with the VARIED values
-    mydtype = []
+    # set up dtype for a np.zeros which will be filled with the VARIED values (so this is from table_variables)
+    mydtype = [] # the table_variables can contain time/date, counts, wavelength settings, etc. Not all 'floats'!
     for i in np.arange(len(parnames)):
         mydtype.append((parnames[i], vartype2017[parnames[i]])) 
     pars = np.zeros(measurement_nr_o_points, dtype = mydtype)
     #for n in range(measurement_nr_o_points):
-    for n in range(file_format_table_variables_nr_o_rows-1): # -1 because we the nr_o_rows includes the 'parnames' line
+    for n in range(file_format_table_variables_nr_o_rows-1): # -1 because the nr_o_rows includes the 'parnames' line
         pars[n] = tuple(a[file_format_table_constants_nr_o_rows+1+n].split('\t')[0:file_format_table_variables_nr_o_columns])
     measuring_time_sec = pars['measuring_time_sec']
     Nskip = file_format_table_constants_nr_o_rows + measurement_nr_o_points + 2 #  +2 = +1 for parnames line and +1 for 'pixel_nr ...' line
-    data = np.genfromtxt(filename, skip_header=Nskip)[:,1:]
+    data = np.genfromtxt(filename, skip_header=Nskip)[:,1:] # this is the actual measured data
     x = data[:,0]
     y_raw = data[:,1:]
     label = '(' + header['file_name'].split('.txt')[0] + ') ' + header['experiment_name'] + ' ' + header['measurement_sample_name'] + ' ' + header['measurement_comment'] + ' ' + header['measurement_sample_environment']
@@ -792,7 +795,7 @@ def newread_file(filename):
         if 'data filename' in headernew:
             header['file_name'] = headernew['data filename']
         if 'Scan filename' in headernew:
-            header['labview_configuration_filename'] = headernew['Scan filename']
+            header['self.configuration_filename'] = headernew['Scan filename']
         if 'Title' in headernew:
             header['experiment_name'] = headernew['Title']
         if 'Comment' in headernew:
@@ -831,8 +834,8 @@ def newread_file(filename):
         headernew[a[i].split('\t')[0]] = a[i].split('\t')[1]
     header = convert_headernew( headernew)
     measuring_time_sec = np.zeros((npoints,1))
-    det = np.zeros((npixels, npoints))
-    mon = np.zeros((npixels, npoints))
+    det = np.zeros((detector_nr_o_pixels, npoints))
+    mon = np.zeros((detector_nr_o_pixels, npoints))
     items=len(a[file_format_table_constants_nr_o_rows].strip().split('\t'))
     if items==6:
         pars = np.empty((npoints),dtype=[('measurement_nr','i4'), ('monochromator_wavelength_AA','f4'), ('monitor_counts','f4'), ('detector_sum_counts','f4'), ('start_time_yyyy-mm-dd_hh:mm:ss','S19'), ('measuring_time_sec','f4')])
@@ -1053,13 +1056,17 @@ class data(object):
             #self.cal=assembled_vanadium # use 133 vana to replace 533 Bragg peaks of V
             #self.cal=nospurions_perspexed # use perspex to replace Bragg peaks of V
             self.cal = DETEFF # see the top of this file 
-        self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(npixels,self.measurement_nr_o_points)
+        self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(detector_nr_o_pixels,self.measurement_nr_o_points)
         self.treat_data()
         if x is not None: # if you want something else than 2theta as x axis
             if x is 'Q':
                 self.x = self.Q
+                self.x_axis_type = 'Q'
             if x is 'd':
                 self.x = self.d
+                self.x_axis_type = 'd'
+        else:
+            self.x_axis_type = 'tth'
         if par is not None:
             self.par = par
         #elif hasattr(self,'pars') and 'oxford_itc502_temperature1_set_K' in self.pars.dtype.names:
@@ -1123,26 +1130,28 @@ class data(object):
                 self.y_raw[:,n] = np.interp( orig, keep, ytmp[:,n] )
             self.treat_data()
 
-    def set_Q_d(self):
+    def calc_Q_d(self):
         """ if 2theta_M setting was recognized, set d and Q axis accordingly.
         """
-        setQd = False
-        if hasattr(self,'pars'):
-            # mind you: convert from np.float to float
-            # round to allow exact match to '2.51' 
-            wavelength=round(float(self.pars['monochromator_wavelength_AA'][0]),2)
-            setQd = True
-        if hasattr(self,'wavelength'):
-            # mind you: convert from np.float to float
-            # round to allow exact match to '2.51' 
-            print('pearl.data.set_Q_d(): already have self.pars.wavelength')
-            wavelength=round(float(self.wavelength),2)
-            setQd = True
+        doQd = False # our ground state attitude: do nothing
+        if hasattr(self,'pars') and 'monochromator_wavelength_AA' in self.pars.dtype.names:
+            # pre-20dec2017: wavelength=round(float(self.pars['monochromator_wavelength_AA'][0]),2)
+            # in self.pars most dtypes were "f4", which is np.float32. For an == operation, both arguments need to be float32
+            self.wavelength=self.pars['monochromator_wavelength_AA'].round(2)
+            self.reflection=np.zeros(self.wavelength.shape)
+            self.Q = np.zeros((detector_nr_o_pixels,self.wavelength.size))
+            self.d = np.zeros((detector_nr_o_pixels,self.wavelength.size))
+            # self.cal = np.zeros((detector_nr_o_pixels,self.wavelength.size))  # not needed because generated in class data __init__()
+            doQd = True
+#        elif hasattr(self,'wavelength'):
+#            print('pearl.data.calc_Q_d(): already have self.wavelength')
+#            self.wavelength=self.wavelength.round(2)
+#            doQd = True
         if not hasattr(self,'header'):
-            print('header does not exist: skip most of self.setQd()')
-            setQd = False
-        if setQd:
-            print('pearl.data.set_Q_d() subtracts a fitted instrumental zero for 311, 533, and 733 reflections')
+            print('header does not exist: skip most of self.calc_Q_d()')
+            doQd = False
+        if doQd:
+            print('pearl.data.calc_Q_d() subtracts a fitted instrumental zero for tth for 311, 533, and 733 reflections')
             self.Q133 = 4*np.pi/lambda_133_cal_AA * np.sin( (self.x - zero_133_cal_deg) / 360 * np.pi )
             self.Q533 = 4*np.pi/lambda_533_cal_AA * np.sin( (self.x - zero_533_cal_deg) / 360 * np.pi )
             self.Q733 = 4*np.pi/lambda_733_cal_AA * np.sin( (self.x - zero_733_cal_deg) / 360 * np.pi )
@@ -1153,60 +1162,60 @@ class data(object):
             self.d733 = 2* np.pi / self.Q733 
             self.d755 = 2* np.pi / self.Q755 
             self.d955 = 2* np.pi / self.Q955 
-            if (wavelength == 0.00):
-                self.wavelength=lambda_533_cal_AA
-                self.reflection='unknown'
-                self.Q=self.Q533
-                self.d=self.d533
-            if (wavelength == 2.51):
-                self.wavelength=lambda_133_cal_AA
-                self.reflection=133
-                self.Q=self.Q133
-                self.d=self.d133
-                #self.cal=DETEFF133
-                print('detector efficiency correction NOT using 133')
-                self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(npixels,self.measurement_nr_o_points)
-            if (wavelength == 1.67):
-                self.wavelength=lambda_533_cal_AA
-                self.reflection=533
-                self.Q=self.Q533
-                self.d=self.d533
-            if (wavelength == 1.33):
-                self.wavelength=lambda_733_cal_AA
-                self.reflection=733
-                self.Q=self.Q733
-                self.d=self.d733
-#                self.cal=DETEFF733
-#                self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(npixels,self.measurement_nr_o_points)
-                print('detector efficiency correction NOT using 733')
-            if (wavelength == 1.10):
-                self.wavelength=lambda_755_cal_AA
-                self.reflection=755
-                self.Q=self.Q755
-                self.d=self.d755
-                self.cal=DETEFF755
-                self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(npixels,self.measurement_nr_o_points)
-                print('detector efficiency correction using 755')
-            if (wavelength == 0.95):
-                self.wavelength=lambda_955_cal_AA
-                self.reflection=955
-                self.Q=self.Q955
-                self.d=self.d955
-                self.cal=DETEFF955
-                self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(npixels,self.measurement_nr_o_points)
-                print('detector efficiency correction using 955')
+            for n,wavelength in enumerate(self.wavelength):
+                print('n,wavelength: {}, {:1.2f}'.format(n,wavelength))
+                if (wavelength == np.float32(0.00)):
+                    self.wavelength[n]=lambda_533_cal_AA
+                    self.reflection[n]='unknown'
+                    self.Q[:,n]=self.Q533
+                    self.d[:,n]=self.d533
+                if (wavelength == np.float32(2.51)):
+                    self.wavelength[n]=lambda_133_cal_AA
+                    self.reflection[n]=133
+                    self.Q[:,n]=self.Q133
+                    self.d[:,n]=self.d133
+                    self.cal[:,n]=DETEFF133
+                    print('detector efficiency correction NOT using 133')
+                if (wavelength == np.float32(1.67)):
+                    self.wavelength[n]=lambda_533_cal_AA
+                    self.reflection[n]=533
+                    self.Q[:,n]=self.Q533
+                    self.d[:,n]=self.d533
+                    self.cal[:,n]=DETEFF533
+                if (wavelength == np.float32(1.33)):
+                    self.wavelength[n]=lambda_733_cal_AA
+                    self.reflection[n]=733
+                    self.Q[:,n]=self.Q733
+                    self.d[:,n]=self.d733
+                    self.cal[:,n]=DETEFF733
+                    print('detector efficiency correction NOT using 733')
+                if (wavelength == np.float32(1.10)):
+                    self.wavelength[n]=lambda_755_cal_AA
+                    self.reflection[n]=755
+                    self.Q[:,n]=self.Q755
+                    self.d[:,n]=self.d755
+                    self.cal[:,n]=DETEFF755
+                    print('detector efficiency correction using 755')
+                if (wavelength == np.float32(0.95)):
+                    self.wavelength[n]=lambda_955_cal_AA
+                    self.reflection[n]=955
+                    self.Q[:,n]=self.Q955
+                    self.d[:,n]=self.d955
+                    self.cal[:,n]=DETEFF955
+                    print('detector efficiency correction using 955')
         else:
             if hasattr(self,'header'):
                 self.d = self.d533 # by default
                 self.Q = self.Q533 # by default
                 print('note: self.pars does not exist for this file, assuming reflection 533')
             else:
-                print('header does not exist: skip most of self.setQd()')
+                print('header does not exist: skip most of self.do_Qd()')
 
     def treat_data(self):
-        self.x = tth.copy() # the calibrated X axis
+        self.tth = tth.copy() # the calibrated X axis
+        self.x = self.tth.copy() # the calibrated X axis
         # 
-        self.set_Q_d() 
+        self.calc_Q_d() 
         self.err_raw=np.sqrt(self.y_raw)
         self.xy_raw=np.column_stack((self.x_raw,self.y_raw)).T
         self.xye_raw=np.column_stack((self.x_raw,self.y_raw,self.err_raw)).T
@@ -1514,7 +1523,7 @@ class data(object):
             self.contour = True
         else:
             self.contour = False
-        if yspread is True:
+        if yspread is True: # plot all measurement 'smeared out vertically' for overview
             current_fig = plt.get_fignums()[-1]
             plt.figure()
             plt.ylim([0,self.measurement_nr_o_points+2])
@@ -1524,19 +1533,30 @@ class data(object):
                 plt.text(self.x[-1]*1.05, n , '{}'.format(n))
             plt.title(self.label)
             plt.figure(current_fig)
-
         if label:
             self.label = label
-        if x is None or x is '2theta' or x is 'tth' or x is 'twotheta' or x is '2th':
+        print('pearl.data.plot(): x = ')
+        print(x)
+        print(self.x)
+        print(self.x.shape)
+        if x is None: # nothing asked within a pearl.data.plot() call
             Xhere=self.x
+            if self.x_axis_type is 'tth':
+                xlabel='2$\Theta$ /deg'
+            elif self.x_axis_type is 'Q':
+                xlabel = 'Q /$\AA^{-1}$'
+            elif self.x_axis_type is 'd':
+                xlabel = 'd /$\AA$'
+        elif x is '2theta' or x is 'tth' or x is 'twotheta' or x is '2th':
+            Xhere=self.tth
             xlabel='2$\Theta$ /deg'
         elif x is 'Q':
+            print('pearl.data.plot(): Q.shape = {}'.format(self.Q.shape))
             Xhere=self.Q
-            xlabel='Q /$\\AA^{-1}$'
-            print('setting Q as x-axis')
+            xlabel='Q /$\AA^{-1}$'
         elif x is 'd':
             Xhere=self.d
-            xlabel='d-spacing /$\\AA$'
+            xlabel='d-spacing /$\AA$'
         if marker:
             self.marker = marker
         if marker:
@@ -1566,7 +1586,7 @@ class data(object):
         elif group is None: # if npoints>1 , more than one measurement in one file and plot() not called with group=
             #CM=plt.cm.viridis(np.linspace(0,1,self.measurement_nr_o_points))
             CM=plt.cm.Spectral(np.linspace(0,1,self.measurement_nr_o_points))
-            if par is None: # this par should be the one called by plot(par='bla'), not data(par='bla')
+            if par is None: # this par should be the one called by pearl.data.plot(par='bla'), not pearl.data(par='bla')
                 parindex = self.pars.dtype.names.index(self.par)  # self.par was already set in the data() routine
             elif par in self.pars.dtype.names:     
                 parindex = self.pars.dtype.names.index(par)
@@ -1576,13 +1596,13 @@ class data(object):
             for P in np.arange(self.measurement_nr_o_points):
                 LABEL = '{:03n}: {:s}={:3.1f}'.format(P,self.par,self.pars[P][parindex])
                 if self.errorbar:
-                    self.graphhandle.append(plt.errorbar(Xhere, self.Y[:,P], self.eY[:,P], markersize=3, label=LABEL, color=CM[P,:]))
+                    self.graphhandle.append(plt.errorbar(Xhere[:,P], self.Y[:,P], self.eY[:,P], markersize=3, label=LABEL, color=CM[P,:]))
                     if self.cps and self.corr:
                         plt.ylabel('counts per second')
                     else:
                         plt.ylabel('counts')
                 else:
-                    self.graphhandle.append(plt.plot(Xhere, self.Y[:,P], self.eY[:,P], markersize=3, label=LABEL, color=CM[P,:]))
+                    self.graphhandle.append(plt.plot(Xhere[:,P], self.Y[:,P], self.eY[:,P], markersize=3, label=LABEL, color=CM[P,:]))
                     if self.cps and self.corr:
                         plt.ylabel('counts per second')
                     else:
@@ -1600,7 +1620,7 @@ class data(object):
 
         else: # group is not None, so plot each of the group element in black:
             for g in group:
-                self.graphhandle.append(plt.plot(Xhere, group[g] , markersize=3, label=g, color='k', zorder=3))
+                self.graphhandle.append(plt.plot(Xhere[:,g], group[g] , markersize=3, label=g, color='k', zorder=3))
         self.linehandle = self.graphhandle[0][0]
         if self.errorbar:
                 self.errorbarhandle = self.graphhandle[0][1]
@@ -2033,12 +2053,11 @@ class disfile(object):
         self.filename = filename
         self.filenamelabel=self.filename.split('.dat')[0]
         self.label=self.filenamelabel
-        print(self.label)
         self.measuring_time_sec = 0
         self.mon = 0
         import pandas as pd
-        self.filecontent = pd.read_csv(filename, sep='\t')
-        self.measuring_time_sec = self.filecontent.iloc[-1,1]
+        self.data_orig = pd.read_csv(filename, sep='\t')
+        self.measuring_time_sec = self.data_orig.iloc[-1,1]
         self.measuring_time_minutes = self.measuring_time_sec / 60
         self.measuring_time_hours = self.measuring_time_sec / 3600
         self.measuring_time_clock = str(dt.timedelta(seconds=self.measuring_time_sec))
@@ -2047,7 +2066,8 @@ class disfile(object):
         self.measuring_time_hours = self.measuring_time_sec / 3600
         bankswapmask = np.flipud(np.arange(0,128))
         self.detswapmask = np.asarray([bankswapmask, bankswapmask+150, bankswapmask+300, bankswapmask+450, bankswapmask+600, bankswapmask+750, bankswapmask+900, bankswapmask+1050, bankswapmask+1200, bankswapmask+1350, bankswapmask+1500]).flatten()
-        self.data = self.filecontent.iloc[self.detswapmask,:]
+        self.index = np.arange(1408)
+        self.data = self.data_orig.iloc[self.detswapmask,:]
 
 def angle_to_pixel(angle):
     for i in np.arange(np.asarray(angle).size):
