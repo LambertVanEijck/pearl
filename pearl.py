@@ -974,7 +974,7 @@ class tmp(object):
 
 class data(object):
     numberOfDataRead = 0
-    def __init__(self,filename, label = None, color = None, marker = None, det = None, plot=True, cps=True, corr=True, errorbar=True, summarize=False, x=None, par=None):
+    def __init__(self,filename, label = None, color = None, marker = None, deteff = None, plot=True, cps=True, corr=True, errorbar=True, summarize=False, x=None, par=None):
         import os.path
         self.cps = cps
         self.corr = corr
@@ -1049,13 +1049,14 @@ class data(object):
         if marker:
             self.marker = marker
         self.graphhandle=[]
-        if det == None:  # if not det efficiency from the user: use one of the below
+        if deteff == None:  # if not det efficiency from the user: use one of the below
             #self.cal=AmBe_cal # get det efficiency from this pearl module (bottom)
             #self.cal=pmma 
             #self.cal=vanadium 
             #self.cal=assembled_vanadium # use 133 vana to replace 533 Bragg peaks of V
             #self.cal=nospurions_perspexed # use perspex to replace Bragg peaks of V
             self.cal = DETEFF # see the top of this file 
+        # inserting the same calibration for all measurements in the file, assuming the same wavelength
         self.cal = self.cal.repeat(self.measurement_nr_o_points).reshape(detector_nr_o_pixels,self.measurement_nr_o_points)
         self.treat_data()
         if x is not None: # if you want something else than 2theta as x axis
@@ -1069,7 +1070,6 @@ class data(object):
             self.x_axis_type = 'tth'
         if par is not None:
             self.par = par
-        #elif hasattr(self,'pars') and 'oxford_itc502_temperature1_set_K' in self.pars.dtype.names:
         elif hasattr(self,'pars'):
             self.par = self.pars.dtype.names[1] # table_variables: the second column contains the first variable that is being 'scanned' (mostly one single value though)
         if (plot == True):
@@ -1092,11 +1092,11 @@ class data(object):
                 self.xmax=args[0]
 
             mask = (tth>self.xmin) & (tth<self.xmax)
-            self.x = self.x[mask]
-            self.d = self.d[mask]
-            self.Q = self.Q[mask]
+            self.x = self.x[mask,:]
+            self.d = self.d[mask,:]
+            self.Q = self.Q[mask,:]
             if self.measurement_nr_o_points == 1:
-                self.y_raw = self.y_raw[mask]
+                self.y_raw = self.y_raw[mask,:]
             self.cal = self.cal[mask]
             self.xmin = self.x[0] # be accurate and make min the real min
             self.xmax = self.x[-1] # be accurate and make max the real max
@@ -1141,6 +1141,7 @@ class data(object):
             self.reflection=np.zeros(self.wavelength.shape)
             self.Q = np.zeros((detector_nr_o_pixels,self.wavelength.size))
             self.d = np.zeros((detector_nr_o_pixels,self.wavelength.size))
+            self.x = self.x.repeat(self.measurement_nr_o_points).reshape(detector_nr_o_pixels, self.measurement_nr_o_points)
             # self.cal = np.zeros((detector_nr_o_pixels,self.wavelength.size))  # not needed because generated in class data __init__()
             doQd = True
 #        elif hasattr(self,'wavelength'):
@@ -1152,18 +1153,17 @@ class data(object):
             doQd = False
         if doQd:
             print('pearl.data.calc_Q_d() subtracts a fitted instrumental zero for tth for 311, 533, and 733 reflections')
-            self.Q133 = 4*np.pi/lambda_133_cal_AA * np.sin( (self.x - zero_133_cal_deg) / 360 * np.pi )
-            self.Q533 = 4*np.pi/lambda_533_cal_AA * np.sin( (self.x - zero_533_cal_deg) / 360 * np.pi )
-            self.Q733 = 4*np.pi/lambda_733_cal_AA * np.sin( (self.x - zero_733_cal_deg) / 360 * np.pi )
-            self.Q755 = 4*np.pi/lambda_755_cal_AA * np.sin( self.x / 360 * np.pi )
-            self.Q955 = 4*np.pi/lambda_955_cal_AA * np.sin( self.x / 360 * np.pi )
+            self.Q133 = 4*np.pi/lambda_133_cal_AA * np.sin( (self.tth - zero_133_cal_deg) / 360 * np.pi )
+            self.Q533 = 4*np.pi/lambda_533_cal_AA * np.sin( (self.tth - zero_533_cal_deg) / 360 * np.pi )
+            self.Q733 = 4*np.pi/lambda_733_cal_AA * np.sin( (self.tth - zero_733_cal_deg) / 360 * np.pi )
+            self.Q755 = 4*np.pi/lambda_755_cal_AA * np.sin( self.tth / 360 * np.pi )
+            self.Q955 = 4*np.pi/lambda_955_cal_AA * np.sin( self.tth / 360 * np.pi )
             self.d133 = 2* np.pi / self.Q133 
             self.d533 = 2* np.pi / self.Q533 
             self.d733 = 2* np.pi / self.Q733 
             self.d755 = 2* np.pi / self.Q755 
             self.d955 = 2* np.pi / self.Q955 
             for n,wavelength in enumerate(self.wavelength):
-                print('n,wavelength: {}, {:1.2f}'.format(n,wavelength))
                 if (wavelength == np.float32(0.00)):
                     self.wavelength[n]=lambda_533_cal_AA
                     self.reflection[n]='unknown'
@@ -1222,8 +1222,8 @@ class data(object):
         #
         # determine detector pixel efficiencies
         self.deteff_err = np.sqrt(self.cal)
-        self.deteff = self.cal / self.cal.mean()
-        self.deteff_err = self.deteff_err / self.cal.mean()
+        self.deteff = self.cal / self.cal.mean(axis=0)
+        self.deteff_err = self.deteff_err / self.cal.mean(axis=0)
         self.y = self.y_raw / self.deteff
         if self.y.min() <= 0:
             print()
@@ -1535,10 +1535,6 @@ class data(object):
             plt.figure(current_fig)
         if label:
             self.label = label
-        print('pearl.data.plot(): x = ')
-        print(x)
-        print(self.x)
-        print(self.x.shape)
         if x is None: # nothing asked within a pearl.data.plot() call
             Xhere=self.x
             if self.x_axis_type is 'tth':
